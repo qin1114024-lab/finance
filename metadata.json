@@ -1,0 +1,5 @@
+{
+  "name": "Personal Finance Pro",
+  "description": "A comprehensive personal financial management system with bank account tracking, real-time stock portfolio analysis via Gemini AI, and detailed financial reporting.",
+  "requestFramePermissions": []
+}
