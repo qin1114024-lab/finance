@@ -135,15 +135,21 @@ const App: React.FC = () => {
     setTransactions([]);
   };
 
+  // Account Management
   const addAccount = (acc: Omit<Account, 'id'>) => {
     const newAcc = { ...acc, id: Date.now().toString() };
     setAccounts([...accounts, newAcc]);
+  };
+
+  const editAccount = (updatedAcc: Account) => {
+    setAccounts(prev => prev.map(a => a.id === updatedAcc.id ? updatedAcc : a));
   };
 
   const deleteAccount = (id: string) => {
     setAccounts(accounts.filter(a => a.id !== id));
   };
 
+  // Transaction Management
   const addTransaction = (tx: Omit<Transaction, 'id'>) => {
     const newTx = { ...tx, id: Date.now().toString() };
     setTransactions([...transactions, newTx]);
@@ -160,18 +166,87 @@ const App: React.FC = () => {
     }));
   };
 
-  const addStock = (s: Omit<StockHolding, 'currentPrice' | 'averageCost'> & { averageCost?: number }) => {
-    const existing = stocks.find(st => st.symbol === s.symbol);
-    if (existing) {
-        alert("此股票已存在，請使用編輯功能");
-        return;
+  // Stock Management (Buy/Sell with account integration)
+  const handleStockTrade = (
+    action: 'buy' | 'sell',
+    stockData: { symbol: string; name: string; quantity: number; price: number },
+    accountId: string
+  ) => {
+    const totalAmount = stockData.quantity * stockData.price;
+    const date = new Date().toISOString().split('T')[0];
+
+    // 1. Update Stock Holdings
+    let newStocks = [...stocks];
+    const existingIndex = newStocks.findIndex(s => s.symbol === stockData.symbol);
+
+    if (action === 'buy') {
+      if (existingIndex >= 0) {
+        const existing = newStocks[existingIndex];
+        const newQuantity = existing.quantity + stockData.quantity;
+        // Calculate new weighted average cost
+        const totalCost = (existing.quantity * existing.averageCost) + totalAmount;
+        const newAvgCost = totalCost / newQuantity;
+        
+        newStocks[existingIndex] = {
+          ...existing,
+          quantity: newQuantity,
+          averageCost: newAvgCost,
+          currentPrice: stockData.price // Update current price to latest transaction
+        };
+      } else {
+        newStocks.push({
+          symbol: stockData.symbol,
+          name: stockData.name,
+          quantity: stockData.quantity,
+          averageCost: stockData.price,
+          currentPrice: stockData.price
+        });
+      }
+    } else {
+      // Sell
+      if (existingIndex >= 0) {
+        const existing = newStocks[existingIndex];
+        const newQuantity = existing.quantity - stockData.quantity;
+        if (newQuantity <= 0) {
+          // Remove if sold out
+          newStocks = newStocks.filter(s => s.symbol !== stockData.symbol);
+        } else {
+          newStocks[existingIndex] = {
+            ...existing,
+            quantity: newQuantity,
+            // Average cost doesn't change on sell, only on buy
+            currentPrice: stockData.price
+          };
+        }
+      } else {
+        console.error("Cannot sell stock you don't own");
+        return; 
+      }
     }
-    const newStock: StockHolding = {
-        ...s,
-        averageCost: s.averageCost || 0,
-        currentPrice: s.averageCost || 0,
+    setStocks(newStocks);
+
+    // 2. Update Account Balance
+    setAccounts(prev => prev.map(a => {
+      if (a.id === accountId) {
+        return {
+          ...a,
+          balance: action === 'buy' ? a.balance - totalAmount : a.balance + totalAmount
+        };
+      }
+      return a;
+    }));
+
+    // 3. Record Transaction
+    const tx: Transaction = {
+      id: Date.now().toString(),
+      accountId,
+      date,
+      amount: totalAmount,
+      type: action === 'buy' ? 'expense' : 'income',
+      category: '投資',
+      note: `${action === 'buy' ? '買入' : '賣出'} ${stockData.symbol} ${stockData.quantity}股 @ ${stockData.price}`
     };
-    setStocks([...stocks, newStock]);
+    setTransactions([...transactions, tx]);
   };
 
   const updatePrices = async () => {
@@ -198,8 +273,7 @@ const App: React.FC = () => {
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Personal Finance Pro</h1>
           <p className="text-slate-500 mb-8">您的智慧個人財務管家 (Firebase 雲端版)</p>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input name="username" type="text" placeholder="使用者名稱 (如: demo-user)" className="input w-full" required />
-            <input type="password" placeholder="密碼 (任意)" className="input w-full" required />
+            <input name="username" type="text" placeholder="輸入您的名稱開始 (如: Alice)" className="input w-full" required />
             <button type="submit" className="btn-primary w-full py-3 text-lg">登入 / 註冊</button>
           </form>
           <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400">
@@ -298,8 +372,8 @@ const App: React.FC = () => {
       <main className="flex-1 lg:ml-72 p-4 lg:p-8 pt-20 lg:pt-8 overflow-y-auto">
         <div className="max-w-6xl mx-auto">
           {activeTab === 'dashboard' && <DashboardView accounts={accounts} stocks={stocks} transactions={transactions} advice={aiAdvice} />}
-          {activeTab === 'accounts' && <AccountsView accounts={accounts} onAdd={addAccount} onDelete={deleteAccount} />}
-          {activeTab === 'stocks' && <StocksView stocks={stocks} onAdd={addStock} onUpdatePrices={updatePrices} isLoading={aiLoading} />}
+          {activeTab === 'accounts' && <AccountsView accounts={accounts} onAdd={addAccount} onEdit={editAccount} onDelete={deleteAccount} />}
+          {activeTab === 'stocks' && <StocksView stocks={stocks} accounts={accounts} onTrade={handleStockTrade} onUpdatePrices={updatePrices} isLoading={aiLoading} />}
           {activeTab === 'transactions' && <TransactionsView transactions={transactions} accounts={accounts} onAdd={addTransaction} />}
         </div>
       </main>

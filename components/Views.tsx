@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { 
   Wallet, TrendingUp, ArrowUpRight, ArrowDownRight, 
-  Plus, Trash2, Edit2, RefreshCw, DollarSign, Activity 
+  Plus, Trash2, Edit2, RefreshCw, DollarSign, Activity, Info 
 } from 'lucide-react';
 import { Account, StockHolding, Transaction } from '../types';
 
@@ -136,47 +136,66 @@ export const DashboardView: React.FC<DashboardProps> = ({ accounts, stocks, tran
 interface AccountsProps {
   accounts: Account[];
   onAdd: (acc: Omit<Account, 'id'>) => void;
+  onEdit: (acc: Account) => void;
   onDelete: (id: string) => void;
 }
 
-export const AccountsView: React.FC<AccountsProps> = ({ accounts, onAdd, onDelete }) => {
+export const AccountsView: React.FC<AccountsProps> = ({ accounts, onAdd, onEdit, onDelete }) => {
   const [showForm, setShowForm] = useState(false);
-  const [newAcc, setNewAcc] = useState({ name: '', bankName: '', balance: 0, type: 'checking' as const, currency: 'TWD' });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Omit<Account, 'id'>>({ name: '', bankName: '', balance: 0, type: 'checking', currency: 'TWD' });
+
+  const startEdit = (acc: Account) => {
+    setEditingId(acc.id);
+    setFormData(acc);
+    setShowForm(true);
+  };
+
+  const startAdd = () => {
+    setEditingId(null);
+    setFormData({ name: '', bankName: '', balance: 0, type: 'checking', currency: 'TWD' });
+    setShowForm(true);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd(newAcc);
+    if (editingId) {
+      onEdit({ ...formData, id: editingId });
+    } else {
+      onAdd(formData);
+    }
     setShowForm(false);
-    setNewAcc({ name: '', bankName: '', balance: 0, type: 'checking', currency: 'TWD' });
+    setEditingId(null);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">銀行帳戶管理</h2>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
+        <button onClick={startAdd} className="btn-primary flex items-center gap-2">
           <Plus size={18} /> 新增帳戶
         </button>
       </div>
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 animate-slide-down">
+          <h3 className="font-bold text-slate-800 mb-4">{editingId ? '編輯帳戶' : '新增帳戶'}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">帳戶名稱</label>
-              <input required className="input" value={newAcc.name} onChange={e => setNewAcc({ ...newAcc, name: e.target.value })} placeholder="例如：薪資轉帳戶" />
+              <input required className="input" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="例如：薪資轉帳戶" />
             </div>
             <div>
               <label className="label">銀行名稱</label>
-              <input required className="input" value={newAcc.bankName} onChange={e => setNewAcc({ ...newAcc, bankName: e.target.value })} placeholder="例如：中國信託" />
+              <input required className="input" value={formData.bankName} onChange={e => setFormData({ ...formData, bankName: e.target.value })} placeholder="例如：中國信託" />
             </div>
             <div>
-              <label className="label">初始餘額</label>
-              <input required type="number" className="input" value={newAcc.balance} onChange={e => setNewAcc({ ...newAcc, balance: Number(e.target.value) })} />
+              <label className="label">目前餘額</label>
+              <input required type="number" className="input" value={formData.balance} onChange={e => setFormData({ ...formData, balance: Number(e.target.value) })} />
             </div>
             <div>
               <label className="label">類型</label>
-              <select className="input" value={newAcc.type} onChange={e => setNewAcc({ ...newAcc, type: e.target.value as any })}>
+              <select className="input" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })}>
                 <option value="checking">活存 (Checking)</option>
                 <option value="saving">定存 (Saving)</option>
                 <option value="investment">證券戶 (Investment)</option>
@@ -186,7 +205,7 @@ export const AccountsView: React.FC<AccountsProps> = ({ accounts, onAdd, onDelet
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">取消</button>
-            <button type="submit" className="btn-primary">儲存</button>
+            <button type="submit" className="btn-primary">{editingId ? '更新' : '儲存'}</button>
           </div>
         </form>
       )}
@@ -194,9 +213,14 @@ export const AccountsView: React.FC<AccountsProps> = ({ accounts, onAdd, onDelet
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {accounts.map(acc => (
           <div key={acc.id} className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative group">
-            <button onClick={() => onDelete(acc.id)} className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Trash2 size={18} />
-            </button>
+             <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => startEdit(acc)} className="text-slate-300 hover:text-brand-500">
+                  <Edit2 size={18} />
+                </button>
+                <button onClick={() => onDelete(acc.id)} className="text-slate-300 hover:text-rose-500">
+                  <Trash2 size={18} />
+                </button>
+             </div>
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                 <Wallet size={24} />
@@ -224,31 +248,76 @@ export const AccountsView: React.FC<AccountsProps> = ({ accounts, onAdd, onDelet
 // --- STOCKS VIEW ---
 interface StocksProps {
   stocks: StockHolding[];
-  onAdd: (stock: Omit<StockHolding, 'currentPrice' | 'averageCost'>) => void; // Simplified adding
+  accounts: Account[];
+  onTrade: (action: 'buy' | 'sell', stockData: { symbol: string; name: string; quantity: number; price: number }, accountId: string) => void;
   onUpdatePrices: () => void;
   isLoading: boolean;
 }
 
-export const StocksView: React.FC<StocksProps> = ({ stocks, onAdd, onUpdatePrices, isLoading }) => {
+export const StocksView: React.FC<StocksProps> = ({ stocks, accounts, onTrade, onUpdatePrices, isLoading }) => {
   const [showForm, setShowForm] = useState(false);
-  const [newStock, setNewStock] = useState({ symbol: '', name: '', quantity: 0, cost: 0 });
+  // Mode: 'buy' (new or add to existing) or 'sell' (reduce existing)
+  const [tradeMode, setTradeMode] = useState<'buy' | 'sell'>('buy');
+  const [selectedStock, setSelectedStock] = useState<StockHolding | null>(null);
+
+  const [formData, setFormData] = useState({ symbol: '', name: '', quantity: 0, price: 0, accountId: '' });
+
+  // Init form data when opening modal
+  useEffect(() => {
+    if (showForm) {
+      if (tradeMode === 'sell' && selectedStock) {
+        setFormData({
+          symbol: selectedStock.symbol,
+          name: selectedStock.name,
+          quantity: 0,
+          price: selectedStock.currentPrice, // Suggest current price
+          accountId: accounts[0]?.id || ''
+        });
+      } else {
+        // Buy mode
+        setFormData({
+            symbol: '',
+            name: '',
+            quantity: 0,
+            price: 0,
+            accountId: accounts[0]?.id || ''
+        });
+      }
+    }
+  }, [showForm, tradeMode, selectedStock, accounts]);
 
   const totalCost = stocks.reduce((sum, s) => sum + (s.averageCost * s.quantity), 0);
   const marketValue = stocks.reduce((sum, s) => sum + (s.currentPrice * s.quantity), 0);
   const totalPL = marketValue - totalCost;
   const plPercent = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
 
+  const handleOpenBuy = () => {
+    setTradeMode('buy');
+    setSelectedStock(null);
+    setShowForm(true);
+  };
+
+  const handleOpenSell = (stock: StockHolding) => {
+    setTradeMode('sell');
+    setSelectedStock(stock);
+    setShowForm(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // When adding manually, we assume current price roughly equals cost initially until updated
-    onAdd({ 
-      symbol: newStock.symbol.toUpperCase(), 
-      name: newStock.name, 
-      quantity: newStock.quantity, 
-    } as any); 
-    // Note: The parent handler handles logic for cost/price init
+    if (!formData.accountId) {
+      alert("請選擇銀行帳戶");
+      return;
+    }
+    
+    onTrade(tradeMode, {
+      symbol: formData.symbol.toUpperCase(),
+      name: formData.name,
+      quantity: formData.quantity,
+      price: formData.price
+    }, formData.accountId);
+
     setShowForm(false);
-    setNewStock({ symbol: '', name: '', quantity: 0, cost: 0 });
   };
 
   return (
@@ -264,8 +333,8 @@ export const StocksView: React.FC<StocksProps> = ({ stocks, onAdd, onUpdatePrice
             <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
             {isLoading ? "AI 更新中..." : "AI 更新股價"}
           </button>
-          <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
-            <Plus size={18} /> 新增持股
+          <button onClick={handleOpenBuy} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> 新增持股/買入
           </button>
         </div>
       </div>
@@ -294,33 +363,59 @@ export const StocksView: React.FC<StocksProps> = ({ stocks, onAdd, onUpdatePrice
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 animate-slide-down">
-          <h3 className="font-bold mb-4">新增持股紀錄</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-1">
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 animate-slide-down relative z-10">
+          <h3 className="font-bold mb-4 text-lg border-b pb-2">
+             {tradeMode === 'buy' ? '買入股票 (扣除銀行餘額)' : '賣出股票 (存入銀行餘額)'}
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
               <label className="label">股票代號</label>
-              <input required className="input uppercase" placeholder="如 2330.TW" value={newStock.symbol} onChange={e => setNewStock({ ...newStock, symbol: e.target.value })} />
+              <input 
+                required 
+                className="input uppercase" 
+                placeholder="如 2330.TW" 
+                value={formData.symbol} 
+                onChange={e => setFormData({ ...formData, symbol: e.target.value })}
+                disabled={tradeMode === 'sell'} // Cannot change symbol when selling specific stock
+              />
             </div>
-            <div className="md:col-span-1">
+            <div>
               <label className="label">股票名稱</label>
-              <input required className="input" placeholder="如 台積電" value={newStock.name} onChange={e => setNewStock({ ...newStock, name: e.target.value })} />
+              <input 
+                required 
+                className="input" 
+                placeholder="如 台積電" 
+                value={formData.name} 
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                disabled={tradeMode === 'sell'}
+              />
             </div>
-            <div className="md:col-span-1">
-              <label className="label">持有股數</label>
-              <input required type="number" className="input" value={newStock.quantity} onChange={e => setNewStock({ ...newStock, quantity: Number(e.target.value) })} />
+            <div>
+              <label className="label">交易股數</label>
+              <input required type="number" min="1" className="input" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: Number(e.target.value) })} />
+              {tradeMode === 'sell' && selectedStock && (
+                  <p className="text-xs text-slate-500 mt-1">目前持有: {selectedStock.quantity} 股</p>
+              )}
             </div>
-            <div className="md:col-span-1">
-              {/* In a real app this would be derived from transactions, here we simplify */}
-              <label className="label">平均買入單價</label> 
-              <input required type="number" className="input" value={newStock.cost} onChange={e => setNewStock({ ...newStock, cost: Number(e.target.value) })} />
+            <div>
+              <label className="label">{tradeMode === 'buy' ? '買入單價' : '賣出單價'}</label> 
+              <input required type="number" className="input" value={formData.price} onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} />
+            </div>
+            <div className="md:col-span-2">
+                <label className="label">{tradeMode === 'buy' ? '扣款帳戶' : '入帳帳戶'}</label>
+                <select required className="input" value={formData.accountId} onChange={e => setFormData({ ...formData, accountId: e.target.value })}>
+                    <option value="" disabled>請選擇帳戶</option>
+                    {accounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.name} (餘額: {formatCurrency(acc.balance)})</option>
+                    ))}
+                </select>
             </div>
           </div>
-          <div className="mt-4 flex justify-end gap-2">
+          <div className="mt-6 flex justify-end gap-2">
             <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">取消</button>
-            <button type="submit" className="btn-primary" onClick={() => {
-                // Hack to pass cost via state for this simple demo
-                 (newStock as any).averageCost = newStock.cost;
-            }}>儲存</button>
+            <button type="submit" className={`btn-primary ${tradeMode === 'sell' ? 'bg-rose-600 hover:bg-rose-700' : ''}`}>
+                {tradeMode === 'buy' ? '確認買入' : '確認賣出'}
+            </button>
           </div>
         </form>
       )}
@@ -328,12 +423,13 @@ export const StocksView: React.FC<StocksProps> = ({ stocks, onAdd, onUpdatePrice
       {/* Stock Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {stocks.length === 0 ? (
-          <div className="p-8 text-center">
-            <div className="bg-blue-50 text-blue-600 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-              <TrendingUp size={24} />
-            </div>
-            <p className="text-slate-800 font-medium">目前無持股資料</p>
-            <p className="text-slate-500 text-sm mt-1">請點擊上方按鈕新增持股</p>
+          // st.info style alert
+          <div className="p-4 m-6 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3 text-blue-800">
+             <Info className="flex-shrink-0 w-5 h-5 mt-0.5" />
+             <div>
+                <p className="font-medium">目前無持股資料</p>
+                <p className="text-sm opacity-80 mt-1">您可以點擊右上角的「新增持股/買入」按鈕來建立您的投資組合。</p>
+             </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -346,6 +442,7 @@ export const StocksView: React.FC<StocksProps> = ({ stocks, onAdd, onUpdatePrice
                   <th className="p-4 font-semibold text-right">現價 (AI)</th>
                   <th className="p-4 font-semibold text-right">市值</th>
                   <th className="p-4 font-semibold text-right">損益</th>
+                  <th className="p-4 font-semibold text-right">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
@@ -365,6 +462,14 @@ export const StocksView: React.FC<StocksProps> = ({ stocks, onAdd, onUpdatePrice
                       <td className="p-4 text-right text-slate-800">{formatCurrency(val)}</td>
                       <td className={`p-4 text-right font-bold ${isUp ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {formatCurrency(pl)}
+                      </td>
+                      <td className="p-4 text-right">
+                          <button 
+                            onClick={() => handleOpenSell(stock)}
+                            className="text-xs bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 px-3 py-1 rounded transition-colors"
+                          >
+                            賣出
+                          </button>
                       </td>
                     </tr>
                   );
